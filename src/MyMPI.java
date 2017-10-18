@@ -1,51 +1,52 @@
 import mpi.*;
+
+import java.io.*;
 import java.math.BigInteger;
 
 public class MyMPI {
-    public static void main(String args[]) throws MPIException {
+    public static void main(String args[]) throws MPIException, IOException, ClassNotFoundException {
         MPI.Init(args);
         Comm comm = MPI.COMM_WORLD;
         int size = comm.getSize();
         int me = comm.getRank();
-        int fact = 102;
-        BigInteger finalResult = BigInteger.valueOf(1);
-        finalResult = fact(me, size, fact);
+        int fact = 100;
+        BigInteger finalResult = fact(me, size, fact);
         int iter = 1;
-        Character character = Character.MIN_VALUE;
+        int arrofInt[] = new int[1];
         while (true) {
             if (iter == size / 2){
                 if((size - 1) == me){
-                    char res[] = new char[10000];
-                    Status status = comm.recv(res, 10000, MPI.CHAR, me - 2, 0);
-                    StringBuilder sb = new StringBuilder();
-                    for (char aResive : res) {
-                        if (aResive != character)
-                            sb.append(aResive);
-                    }
-                    finalResult = finalResult.multiply(new BigInteger(sb.toString()));
+                    int colInt[] = new int[1];
+                    comm.recv(colInt, 1, MPI.INT, me - 2, 1);
+                    byte resultArr[] = new byte[colInt[0]];
+                    comm.recv(resultArr, colInt[0], MPI.BYTE, me - 2, 2);
+                    BigInteger nowRes = deserial(resultArr);
+                    finalResult = finalResult.multiply(nowRes);
                     System.out.println(finalResult);
                     break;
                 }
                 else{
-                    String charInt = finalResult.toString();
-                    comm.send(charInt.toCharArray(), charInt.length(), MPI.CHAR, me + 2, 0);
+                    byte arrofByte[] = serial(finalResult);
+                    arrofInt[0] = arrofByte.length;
+                    comm.send(arrofInt, 1, MPI.INT, me + 2, 1);
+                    comm.send(arrofByte, arrofByte.length, MPI.BYTE, me + 2, 2);
                     break;
                 }
             }
             if ((me % 2) == 0) {
-                String charInt = finalResult.toString();
-                comm.send(charInt.toCharArray(), charInt.length(), MPI.CHAR, me + 1, 0);
+                byte arrofByte[] = serial(finalResult);
+                arrofInt[0] = arrofByte.length;
+                comm.send(arrofInt, 1, MPI.INT, me + 1, 1);
+                comm.send(arrofByte, arrofByte.length, MPI.BYTE, me + 1, 2);
                 break;
             }
             else {
-                char res[] = new char[10000];
-                Status status = comm.recv(res, 10000, MPI.CHAR, me - 1, 0);
-                StringBuilder sb = new StringBuilder();
-                for (char re : res) {
-                    if (re != character)
-                        sb.append(re);
-                }
-                finalResult = finalResult.multiply(new BigInteger(sb.toString()));
+                int colInt[] = new int[1];
+                comm.recv(colInt, 1, MPI.INT, me - 1, 1);
+                byte resultArr[] = new byte[colInt[0]];
+                comm.recv(resultArr, colInt[0], MPI.BYTE, me - 1, 2);
+                BigInteger nowRes = deserial(resultArr);
+                finalResult = finalResult.multiply(nowRes);
                 iter += 1;
             }
         }
@@ -71,5 +72,18 @@ public class MyMPI {
             }
         }
         return res;
+    }
+
+    public static byte[] serial(BigInteger b) throws IOException {
+        ByteArrayOutputStream bys = new ByteArrayOutputStream();
+        ObjectOutputStream oos = new ObjectOutputStream(bys);
+        oos.writeObject(b);
+        return bys.toByteArray();
+    }
+
+    public static BigInteger deserial(byte[] a) throws IOException, ClassNotFoundException {
+        ByteArrayInputStream bys = new ByteArrayInputStream(a);
+        ObjectInputStream ois = new ObjectInputStream(bys);
+        return (BigInteger) ois.readObject();
     }
 }
